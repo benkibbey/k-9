@@ -57,7 +57,7 @@ public class MessageViewInfoExtractor {
         ViewableExtractedText viewable = MessageViewInfoExtractor.extractTextFromViewables(context, viewableParts);
         List<AttachmentViewInfo> attachmentInfos = AttachmentInfoExtractor.extractAttachmentInfos(context, attachments);
 
-        return new MessageViewInfo(message, rootPart, viewable.html, attachmentInfos, null);
+        return new MessageViewInfo(message, rootPart, viewable.html, attachmentInfos, pgpAnnotation);
     }
 
     /**
