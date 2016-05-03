@@ -62,8 +62,6 @@ public class MessageViewFragment extends Fragment implements ConfirmationDialogF
 
     private static final String ARG_REFERENCE = "reference";
 
-    private static final String STATE_PGP_DATA = "pgpData";
-
     private static final int ACTIVITY_CHOOSE_FOLDER_MOVE = 1;
     private static final int ACTIVITY_CHOOSE_FOLDER_COPY = 2;
     private static final int ACTIVITY_CHOOSE_DIRECTORY = 3;
@@ -286,7 +284,7 @@ public class MessageViewFragment extends Fragment implements ConfirmationDialogF
     private void onDecodeMessageFinished(MessageViewInfo messageViewInfo) {
         if (messageViewInfo == null) {
             showUnableToDecodeError();
-            messageViewInfo = new MessageViewInfo(mMessage, null, null, null, null);
+            messageViewInfo = new MessageViewInfo(mMessage, null, null, null, null, null);
         }
 
         this.messageViewInfo = messageViewInfo;
