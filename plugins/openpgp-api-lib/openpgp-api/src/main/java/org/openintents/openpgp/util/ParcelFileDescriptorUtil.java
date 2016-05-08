@@ -24,6 +24,8 @@ import java.io.OutputStream;
 
 import android.os.ParcelFileDescriptor;
 import android.os.ParcelFileDescriptor.AutoCloseInputStream;
+import android.system.ErrnoException;
+import android.system.OsConstants;
 import android.util.Log;
 
 import org.openintents.openpgp.util.OpenPgpApi.OpenPgpDataSink;
@@ -123,7 +125,11 @@ public class ParcelFileDescriptorUtil {
             try {
                 dataSource.writeTo(outputStream);
             } catch (IOException e) {
-                Log.e(OpenPgpApi.TAG, "IOException when writing to out", e);
+                if (isIOExceptionCausedByEPIPE(e)) {
+                    Log.e(OpenPgpApi.TAG, "Stopped writing due to broken pipe (other end closed pipe?)");
+                } else {
+                    Log.e(OpenPgpApi.TAG, "IOException when writing to out", e);
+                }
             } finally {
                 try {
                     outputStream.close();
@@ -131,6 +137,15 @@ public class ParcelFileDescriptorUtil {
                 }
             }
         }
+    }
+
+    private static boolean isIOExceptionCausedByEPIPE(IOException e) {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.LOLLIPOP) {
+            return e.getMessage().contains("EPIPE");
+        }
+
+        Throwable cause = e.getCause();
+        return cause instanceof ErrnoException && ((ErrnoException) cause).errno == OsConstants.EPIPE;
     }
 
     static class DataSinkTransferThread<T> extends Thread {
@@ -150,7 +165,11 @@ public class ParcelFileDescriptorUtil {
             try {
                 sinkResult = dataSink.processData(inputStream);
             } catch (IOException e) {
-                Log.e(OpenPgpApi.TAG, "IOException when writing to out", e);
+                if (isIOExceptionCausedByEPIPE(e)) {
+                    Log.e(OpenPgpApi.TAG, "Stopped read due to broken pipe (other end closed pipe?)");
+                } else {
+                    Log.e(OpenPgpApi.TAG, "IOException while reading from in", e);
+                }
                 sinkResult = null;
             } finally {
                 try {
