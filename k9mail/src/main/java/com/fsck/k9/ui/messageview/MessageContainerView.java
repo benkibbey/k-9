@@ -24,7 +24,6 @@ import android.view.View.OnCreateContextMenuListener;
 import android.view.ViewGroup;
 import android.webkit.WebView;
 import android.webkit.WebView.HitTestResult;
-import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.Toast;
@@ -40,6 +39,7 @@ import com.fsck.k9.mailstore.CryptoResultAnnotation;
 import com.fsck.k9.mailstore.CryptoResultAnnotation.CryptoError;
 import com.fsck.k9.mailstore.MessageViewInfo;
 import com.fsck.k9.view.K9WebViewClient;
+import com.fsck.k9.view.K9WebViewClient.OnPageFinishedListener;
 import com.fsck.k9.view.MessageHeader.OnLayoutChangedListener;
 import com.fsck.k9.view.MessageWebView;
 
@@ -74,7 +74,6 @@ public class MessageContainerView extends LinearLayout implements OnClickListene
     private ClipboardManager mClipboardManager;
     private String mText;
     private Map<AttachmentViewInfo, AttachmentView> attachments = new HashMap<>();
-
 
     @Override
     public void onFinishInflate() {
@@ -394,14 +393,21 @@ public class MessageContainerView extends LinearLayout implements OnClickListene
     }
 
     public void displayMessageViewContainer(MessageViewInfo messageViewInfo,
-            boolean automaticallyLoadPictures, ShowPicturesController showPicturesController,
+            final OnRenderingFinishedListener onRenderingFinishedListener, boolean automaticallyLoadPictures,
+            ShowPicturesController showPicturesController,
             AttachmentViewCallback attachmentCallback) throws MessagingException {
 
         this.attachmentCallback = attachmentCallback;
 
         resetView();
 
-        WebViewClient webViewClient = K9WebViewClient.newInstance(messageViewInfo.rootPart);
+        K9WebViewClient webViewClient = K9WebViewClient.newInstance(messageViewInfo.rootPart);
+        webViewClient.setOnPageFinishedListener(new OnPageFinishedListener() {
+            @Override
+            public void onPageFinished() {
+                onRenderingFinishedListener.onLoadFinished();
+            }
+        });
         mMessageContentView.setWebViewClient(webViewClient);
 
         renderAttachments(messageViewInfo);
@@ -594,5 +600,9 @@ public class MessageContainerView extends LinearLayout implements OnClickListene
             out.writeInt((this.hiddenAttachmentsVisible) ? 1 : 0);
             out.writeInt((this.showingPictures) ? 1 : 0);
         }
+    }
+
+    interface OnRenderingFinishedListener {
+        void onLoadFinished();
     }
 }

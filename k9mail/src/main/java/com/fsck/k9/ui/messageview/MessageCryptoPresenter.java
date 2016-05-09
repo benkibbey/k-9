@@ -24,14 +24,17 @@ public class MessageCryptoPresenter {
     }
 
     public void handleCryptoClick(MessageViewInfo messageViewInfo) {
-        MessageCryptoDisplayStatus displayStatus =
+        MessageCryptoDisplayStatus displayStatus = messageViewInfo == null ? MessageCryptoDisplayStatus.LOADING :
                 MessageCryptoDisplayStatus.fromResultAnnotation(messageViewInfo.cryptoResultAnnotation);
         switch (displayStatus) {
+            case LOADING:
+                messageCryptoMvpView.showCryptoLoadingHint();
+                break;
             case UNENCRYPTED_SIGN_UNKNOWN:
                 launchPendingIntent(messageViewInfo);
                 break;
             default:
-                displaySignatureInfoDialog(displayStatus);
+                displayCryptoInfoDialog(displayStatus);
                 break;
         }
     }
@@ -49,7 +52,7 @@ public class MessageCryptoPresenter {
         messageCryptoMvpView.restartMessageCryptoProcessing();
     }
 
-    private void displaySignatureInfoDialog(MessageCryptoDisplayStatus displayStatus) {
+    private void displayCryptoInfoDialog(MessageCryptoDisplayStatus displayStatus) {
         messageCryptoMvpView.showCryptoInfoDialog(displayStatus);
     }
 
@@ -72,5 +75,6 @@ public class MessageCryptoPresenter {
                 int flagsMask, int flagValues, int extraFlags) throws IntentSender.SendIntentException;
 
         void showCryptoInfoDialog(MessageCryptoDisplayStatus displayStatus);
+        void showCryptoLoadingHint();
     }
 }
