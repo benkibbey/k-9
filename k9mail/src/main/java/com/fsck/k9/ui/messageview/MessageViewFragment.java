@@ -146,6 +146,16 @@ public class MessageViewFragment extends Fragment implements ConfirmationDialogF
     }
 
     @Override
+    public void onDestroy() {
+        super.onDestroy();
+
+        if (messageCryptoHelper != null) {
+            messageCryptoHelper.cancelIfRunning();
+            messageCryptoHelper = null;
+        }
+    }
+
+    @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
             Bundle savedInstanceState) {
         Context context = new ContextThemeWrapper(inflater.getContext(),

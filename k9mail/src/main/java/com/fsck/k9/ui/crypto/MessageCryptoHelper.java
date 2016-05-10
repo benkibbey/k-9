@@ -41,6 +41,7 @@ import org.openintents.openpgp.OpenPgpDecryptionResult;
 import org.openintents.openpgp.OpenPgpError;
 import org.openintents.openpgp.OpenPgpSignatureResult;
 import org.openintents.openpgp.util.OpenPgpApi;
+import org.openintents.openpgp.util.OpenPgpApi.CancelableBackgroundOperation;
 import org.openintents.openpgp.util.OpenPgpApi.IOpenPgpSinkResultCallback;
 import org.openintents.openpgp.util.OpenPgpApi.OpenPgpDataSink;
 import org.openintents.openpgp.util.OpenPgpApi.OpenPgpDataSource;
@@ -68,6 +69,7 @@ public class MessageCryptoHelper {
     private Intent userInteractionResultIntent;
     private LocalMessage currentMessage;
     private boolean secondPassStarted;
+    private CancelableBackgroundOperation cancelableBackgroundOperation;
 
 
     public MessageCryptoHelper(Activity activity, Account account, MessageCryptoCallback callback) {
@@ -229,7 +231,8 @@ public class MessageCryptoHelper {
         OpenPgpDataSource dataSource = getDataSourceForEncryptedOrInlineData();
         OpenPgpDataSink<MimeBodyPart> dataSink = getDataSinkForDecryptedInlineData();
 
-        openPgpApi.executeApiAsync(intent, dataSource, dataSink, new IOpenPgpSinkResultCallback<MimeBodyPart>() {
+        cancelableBackgroundOperation = openPgpApi.executeApiAsync(intent, dataSource, dataSink,
+                new IOpenPgpSinkResultCallback<MimeBodyPart>() {
             @Override
             public void onProgress(int current, int max) {
                 Log.d(K9.LOG_TAG, "received progress status: " + current + " / " + max);
@@ -242,6 +245,12 @@ public class MessageCryptoHelper {
                 onCryptoOperationReturned(bodyPart);
             }
         });
+    }
+
+    public void cancelIfRunning() {
+        if (cancelableBackgroundOperation != null) {
+            cancelableBackgroundOperation.cancelOperation();
+        }
     }
 
     private OpenPgpDataSink<MimeBodyPart> getDataSinkForDecryptedInlineData() {
@@ -266,7 +275,8 @@ public class MessageCryptoHelper {
         OpenPgpDataSource dataSource = getDataSourceForEncryptedOrInlineData();
         OpenPgpDataSink<MimeBodyPart> openPgpDataSink = getDataSinkForDecryptedData();
 
-        openPgpApi.executeApiAsync(intent, dataSource, openPgpDataSink, new IOpenPgpSinkResultCallback<MimeBodyPart>() {
+        cancelableBackgroundOperation = openPgpApi.executeApiAsync(intent, dataSource, openPgpDataSink,
+                new IOpenPgpSinkResultCallback<MimeBodyPart>() {
             @Override
             public void onReturn(Intent result, MimeBodyPart decryptedPart) {
                 currentCryptoResult = result;
