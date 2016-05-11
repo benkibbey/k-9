@@ -13,7 +13,7 @@ import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentSender.SendIntentException;
+import android.support.annotation.Nullable;
 import android.support.annotation.WorkerThread;
 import android.util.Log;
 
@@ -57,8 +57,9 @@ public class MessageCryptoHelper {
 
 
     private final Context context;
-    private final MessageCryptoCallback callback;
-    private final Account account;
+    private final String openPgpProviderPackage;
+    @Nullable
+    private MessageCryptoCallback callback;
 
     private Deque<CryptoPart> partsToDecryptOrVerify = new ArrayDeque<>();
     private OpenPgpApi openPgpApi;
@@ -70,20 +71,22 @@ public class MessageCryptoHelper {
     private LocalMessage currentMessage;
     private boolean secondPassStarted;
     private CancelableBackgroundOperation cancelableBackgroundOperation;
+    private PendingIntent queuedPendingIntent;
+    private MessageCryptoAnnotations queuedMessageAnnotations;
 
 
-    public MessageCryptoHelper(Activity activity, Account account, MessageCryptoCallback callback) {
-        this.context = activity.getApplicationContext();
+    public MessageCryptoHelper(Context context, String openPgpProviderPackage,
+            @Nullable MessageCryptoCallback callback) {
+        this.context = context.getApplicationContext();
         this.callback = callback;
-        this.account = account;
+        this.openPgpProviderPackage = openPgpProviderPackage;
+
+        if (openPgpProviderPackage == null || Account.NO_OPENPGP_PROVIDER.equals(openPgpProviderPackage)) {
+            throw new IllegalStateException("MessageCryptoHelper must only be called with a openpgp provider!");
+        }
     }
 
     public void decryptOrVerifyMessagePartsIfNecessary(LocalMessage message) {
-        if (!account.isOpenPgpProviderConfigured()) {
-            returnResultToFragment();
-            return;
-        }
-
         this.messageAnnotations = new MessageCryptoAnnotations();
         this.currentMessage = message;
 
@@ -172,8 +175,7 @@ public class MessageCryptoHelper {
     }
 
     private void connectToCryptoProviderService() {
-        String openPgpProvider = account.getOpenPgpProvider();
-        new OpenPgpServiceConnection(context, openPgpProvider,
+        new OpenPgpServiceConnection(context, openPgpProviderPackage,
                 new OnBound() {
                     @Override
                     public void onBound(IOpenPgpService2 service) {
@@ -236,7 +238,7 @@ public class MessageCryptoHelper {
             @Override
             public void onProgress(int current, int max) {
                 Log.d(K9.LOG_TAG, "received progress status: " + current + " / " + max);
-                callback.onCryptoHelperProgress(current, max);
+                callbackProgress(current, max);
             }
 
             @Override
@@ -286,7 +288,7 @@ public class MessageCryptoHelper {
             @Override
             public void onProgress(int current, int max) {
                 Log.d(K9.LOG_TAG, "received progress status: " + current + " / " + max);
-                callback.onCryptoHelperProgress(current, max);
+                callbackProgress(current, max);
             }
         });
     }
@@ -307,7 +309,7 @@ public class MessageCryptoHelper {
             @Override
             public void onProgress(int current, int max) {
                 Log.d(K9.LOG_TAG, "received progress status: " + current + " / " + max);
-                callback.onCryptoHelperProgress(current, max);
+                callbackProgress(current, max);
             }
         });
     }
@@ -438,12 +440,7 @@ public class MessageCryptoHelper {
             throw new AssertionError("Expecting PendingIntent on USER_INTERACTION_REQUIRED!");
         }
 
-        try {
-            callback.startPendingIntentForCryptoHelper(
-                    pendingIntent.getIntentSender(), REQUEST_CODE_USER_INTERACTION, null, 0, 0, 0);
-        } catch (SendIntentException e) {
-            Log.e(K9.LOG_TAG, "Internal error on starting pendingintent!", e);
-        }
+        callbackPendingIntent(pendingIntent);
     }
 
     private void handleCryptoOperationError() {
@@ -516,17 +513,64 @@ public class MessageCryptoHelper {
 
     private void runSecondPassOrReturnResultToFragment() {
         if (secondPassStarted) {
-            callback.onCryptoOperationsFinished(messageAnnotations);
+            callbackReturnResult();
             return;
         }
         secondPassStarted = true;
         runSecondPass();
     }
 
-    private void returnResultToFragment() {
-        callback.onCryptoOperationsFinished(messageAnnotations);
+    private final Object callbackLock = new Object();
+
+    public void detachCallback() {
+        synchronized (callbackLock) {
+            callback = null;
+        }
     }
 
+    public void reattachCallback(MessageCryptoCallback callback) {
+        synchronized (callbackLock) {
+            this.callback = callback;
+            deliverResult();
+        }
+    }
+
+    private void callbackPendingIntent(PendingIntent pendingIntent) {
+        synchronized (callbackLock) {
+            queuedPendingIntent = pendingIntent;
+            deliverResult();
+        }
+    }
+
+    private void callbackReturnResult() {
+        synchronized (callbackLock) {
+            queuedMessageAnnotations = messageAnnotations;
+            deliverResult();
+        }
+    }
+
+    private void callbackProgress(int current, int max) {
+        synchronized (callbackLock) {
+            if (callback != null) {
+                callback.onCryptoHelperProgress(current, max);
+            }
+        }
+    }
+
+    // This method must only be called inside a synchronized(callbackLock) block!
+    private void deliverResult() {
+        if (callback == null) {
+            Log.d(K9.LOG_TAG, "Keeping crypto helper result in queue for later delivery");
+            return;
+        }
+        if (queuedMessageAnnotations != null) {
+            callback.onCryptoOperationsFinished(queuedMessageAnnotations);
+        } else if (queuedPendingIntent != null) {
+            callback.startPendingIntentForCryptoHelper(
+                    queuedPendingIntent.getIntentSender(), REQUEST_CODE_USER_INTERACTION, null, 0, 0, 0);
+            queuedPendingIntent = null;
+        }
+    }
 
     private static class CryptoPart {
         public final CryptoPartType type;
