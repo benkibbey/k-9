@@ -27,6 +27,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
 
 import com.fsck.k9.Account;
@@ -202,9 +203,23 @@ public class MessageViewFragment extends Fragment implements ConfirmationDialogF
 
     public void onPendingIntentResult(int requestCode, int resultCode, Intent data) {
         if ((requestCode & REQUEST_MASK_CRYPTO_HELPER) == REQUEST_MASK_CRYPTO_HELPER) {
+            hideKeyboard();
+
             requestCode ^= REQUEST_MASK_CRYPTO_HELPER;
             messageCryptoHelper.onActivityResult(requestCode, resultCode, data);
             return;
+        }
+    }
+
+    private void hideKeyboard() {
+        Activity activity = getActivity();
+        if (activity == null) {
+            return;
+        }
+        InputMethodManager imm = (InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE);
+        View decorView = activity.getWindow().getDecorView();
+        if (decorView != null) {
+            imm.hideSoftInputFromWindow(decorView.getApplicationWindowToken(), 0);
         }
     }
 
