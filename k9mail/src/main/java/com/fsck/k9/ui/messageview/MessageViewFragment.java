@@ -54,13 +54,15 @@ import com.fsck.k9.ui.crypto.MessageCryptoCallback;
 import com.fsck.k9.ui.crypto.MessageCryptoHelper;
 import com.fsck.k9.ui.message.LocalMessageExtractorLoader;
 import com.fsck.k9.ui.message.LocalMessageLoader;
+import com.fsck.k9.ui.messageview.CryptoInfoDialog.OnClickShowCryptoKeyListener;
 import com.fsck.k9.ui.messageview.MessageCryptoPresenter.MessageCryptoMvpView;
 import com.fsck.k9.view.MessageCryptoDisplayStatus;
 import com.fsck.k9.view.MessageHeader;
 
 
 public class MessageViewFragment extends Fragment implements ConfirmationDialogFragmentListener,
-        AttachmentViewCallback, OnCryptoClickListener, MessageCryptoCallback, MessageCryptoMvpView {
+        AttachmentViewCallback, OnCryptoClickListener, MessageCryptoCallback, MessageCryptoMvpView,
+        OnClickShowCryptoKeyListener {
 
     private static final String ARG_REFERENCE = "reference";
 
@@ -766,8 +768,13 @@ public class MessageViewFragment extends Fragment implements ConfirmationDialogF
     }
 
     @Override
-    public void startPendingIntentForCryptoPresenter(IntentSender si, int requestCode, Intent fillIntent,
+    public void startPendingIntentForCryptoPresenter(IntentSender si, Integer requestCode, Intent fillIntent,
             int flagsMask, int flagValues, int extraFlags) throws SendIntentException {
+        if (requestCode == null) {
+            getActivity().startIntentSender(si, fillIntent, flagsMask, flagValues, extraFlags);
+            return;
+        }
+
         requestCode |= REQUEST_MASK_CRYPTO_PRESENTER;
         getActivity().startIntentSenderForResult(
                 si, requestCode, fillIntent, flagsMask, flagValues, extraFlags);
@@ -776,6 +783,7 @@ public class MessageViewFragment extends Fragment implements ConfirmationDialogF
     @Override
     public void showCryptoInfoDialog(MessageCryptoDisplayStatus displayStatus) {
         CryptoInfoDialog dialog = CryptoInfoDialog.newInstance(displayStatus);
+        dialog.setTargetFragment(this, 0);
         dialog.show(getFragmentManager(), "crypto_info_dialog");
     }
 
@@ -805,6 +813,11 @@ public class MessageViewFragment extends Fragment implements ConfirmationDialogF
         } catch (SendIntentException e) {
             Log.e(K9.LOG_TAG, "Irrecoverable error calling PendingIntent!", e);
         }
+    }
+
+    @Override
+    public void onClickShowCryptoKey() {
+        messageCryptoPresenter.onClickShowCryptoKey(messageViewInfo);
     }
 
     public interface MessageViewFragmentListener {
