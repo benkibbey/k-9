@@ -1410,6 +1410,12 @@ public class MessageListFragment extends Fragment implements OnItemClickListener
                 onCopy(getMessageAtPosition(adapterPosition));
                 break;
             }
+
+            // debug options
+            case R.id.debug_delete_locally: {
+                onDebugClearLocally(getMessageAtPosition(adapterPosition));
+                break;
+            }
         }
 
         mContextMenuUniqueId = 0;
@@ -1435,6 +1441,7 @@ public class MessageListFragment extends Fragment implements OnItemClickListener
         }
 
         getActivity().getMenuInflater().inflate(R.menu.message_list_item_context, menu);
+        menu.findItem(R.id.debug_delete_locally).setVisible(K9.DEBUG);
 
         mContextMenuUniqueId = cursor.getLong(mUniqueIdColumn);
         Account account = getAccountFromCursor(cursor);
@@ -2316,6 +2323,10 @@ public class MessageListFragment extends Fragment implements OnItemClickListener
                 messages.get(0).getFolder().getAccountUuid(),
                 null,
                 messages);
+    }
+
+    private void onDebugClearLocally(LocalMessage message) {
+        mController.debugClearMessagesLocally(Collections.singletonList(message));
     }
 
     /**
